@@ -1,3 +1,26 @@
 [[index|back]]
 
 = Chapter 1: Introduction =
+== What is Salt? ==
+Salt is a remote execution framework and configuration management system.
+Written in Python and configured with YAML by default. This can be changed.
+
+== High-Level Architecture ==
+Hosts are minions.
+Actions performed on them are called from the "master" server.
+Client/Master model.
+Salt runs as a daemon on both the master and minion servers.
+Each minion has an ID and each ID must be unique.
+Master sends or "publishes" events.
+Minions receive or "subscribe" to events.
+Publish and Subscribe, Pub-Sub.
+Master has two ports for publish.
+Default is 4505 and 4506.
+Salt states are a way to manage configurations across all minions.
+State has requirements listed.
+Communication done via secure encrypted channel.
+Minions do not have global secrets.
+
+Declarative Vs. Imperative configuration management.
+Imperative give Salt an ordered list of actions to perform.
+Declarative give Salt a desired end state.
