@@ -1,0 +1,4 @@
+[[index|back]]
+
+= Chapter 2: Quick Start: First taste of Salt =
+== Single-Master Setup ==

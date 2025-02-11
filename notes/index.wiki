@@ -2,3 +2,4 @@
 
 == Salt Essentials ==
 [[Chapter 1: Introduction]]
+[[Chapter 2: Quick Start: First taste of Salt]]
