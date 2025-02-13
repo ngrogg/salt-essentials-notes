@@ -3,3 +3,4 @@
 == Salt Essentials ==
 [[Chapter 1: Introduction]]
 [[Chapter 2: Quick Start: First taste of Salt]]
+[[Chapter 3: Execution Modules: The functional foundation]]
