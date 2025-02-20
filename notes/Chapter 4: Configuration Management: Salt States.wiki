@@ -1,0 +1,109 @@
+[[index|back]]
+
+= Chapter 4: Configuration Management: Salt States =
+Salt provies a simple file format that specifies a "recipe" or "state" of how host should be configured.
+
+== State File Overview ==
+Described via Salt State (SLS) files.
+Most basic format is YAML.
+Language agnostic.
+Standard data structure constructs:
+* Strings
+* Numbers
+* Arrays (lists)
+* Hashes (dictionaries)
+
+File format can be altered by using a different renderer
+
+=== SLS Example: Adding a User ===
+Simple SLS file to add a user:
+`user_wilma:
+  user.present:
+    - name: wilma
+    - fullname: Wilma Flintstone
+    - uid: 2001
+    - home: /home/wilma`
+
+State modules call user and function present
+Add user with user.add execution function.
+Check that user exists with the user.present state function.
+State can run over and over again, will only make a change if there is a delta between actual and desired state.
+State calls are idempotent
+
+idempotent
+adjective
+(computing) Describing an action which, when performed multiple times, has no further effect on its subject after the first time it is performed.
+
+==== SLS format and state documentation ====
+Standard YAML file
+First line is an ID that can be referenced in other state files or later in the file.
+Next is a state declaration
+Remember exection and state functions are not the same.
+Use sys.state_doc to look at documentation for a given module:
+`sudo salt-call sys.state_doc user.present`
+
+First argument `name` can be used as the ID of the state itself.
+Rewrite wilma example from earlier:
+`wilma:
+  user.present:
+  - fullname: Wilma Flintstone
+  - uid: 2001
+  - home: /home/wilma`
+
+Helps simplify states but can be awkward if called in other files.
+Can be an issue with packages names.
+Be aware of shortcoming when usings.
+
+==== Setting the file roots ====
+Tell the Salt master where to find the files.
+In salt terms, set up the file server.
+Master config file at `/etc/salt/master`.
+Easier to create subdirectory `/etc/salt/master.d` and save smaller configs there.
+`sudo grep default_include /etc/salt/master
+#default_include: master.d/*.conf`
+
+One of many default configs.
+Example is file-roots:
+`sudo cat /etc/salt/master.d/file-roots.conf
+file_roots:
+  base:
+  - /srv/salt/file/base`
+
+Adjust as needed and restart salt-master: `sudo systemctl restart salt-master`
+
+Store files that need synced from master to minion there.
+Salt has a built in file server that uses ZeroMQ channel to securly transfer files.
+Salt can created overlapping groups called "environments".
+
+==== Executing a state file ====
+Add wilma user file to file_roots directory:
+`cat /srv/salt/file/based/user-wilma.sls
+user_wilma:
+  user.present:
+  - name: wilma
+  - fullname: Wilma Flintstone
+  - uid: 2001
+  - home: /home/wilma`
+
+Many state modules such as pkg and user.
+Many execution modules such as cmd and sys.
+In order to run a state an excuetion module called state is used.
+This is how state modules are run but state itself is not a state module.
+
+Use sys.doc to see state's capabilities:
+`sudo salt master.example state.show_sls user-wilma`
+
+Shows data structure salt uses after reading the file.
+New output "present" is given at the bottom.
+Modules (user) and specific function (prsent) are joined in the original file but pulled apart by Salt when parsing.
+
+Use stat.show_sls to debug salt states.
+Will catch YAML syntax errors
+
+Run state against minion2 with state.sls
+`sudo salt minion2.example state.sls user-wilma`
+
+Can be run repeatedly without causing problems.
+Later on will be used in "highstate", a collection of states that all together form a definition of a host.
+
+=== Working with the Multilayered State System ===
