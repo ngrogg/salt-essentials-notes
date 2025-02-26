@@ -1,0 +1,155 @@
+[[index|back]]
+
+= Chapter 6: Extending Salt: Part 1 =
+== Introduction to Jinja ==
+Data files Salt uses are straightforward YAML/JSON files.
+Easy to use but simple, don't allow for complex logic.
+Jinja is a templating engine most known fo Flask framework
+Comprehensive tutorial beyond scope of book.
+
+Documentation,
+https://jinja.palletsprojects.com/en/stable/
+
+=== Jinja Basics ===
+Example Jinja code:
+`{% set my_name = 'Barney' %}
+Hi {{ my_name }}!`
+
+Should output `Hi Barney!`
+
+Curly braces as delimiter.
+Set variable with `{% %}` and output vriable with `{{ }}`.
+First format used for control structures ala for loop,s if blocks
+Second format used for print statements.
+Lastly there is `{# #}` for comments.
+
+Dummy state fil to run a salt command:
+`cat /srv/salt/file/base/jinja/simple_var.sls
+{% set simple_var = 'a simple variable' %}
+jinja_var:
+  cmd.run:
+  - name: echo "Simple var is {{ simple_var }}"`
+
+Run with
+`sudo salt master.example state.show_sls jinja.simple_var`
+Jinja has lists (arrays) in addition to strings:
+`cat /srv/salt/file/base/jinja/list.sls
+{% set list1 = ['one','two','three'] %}
+jinja_list:
+  cmd.run:
+  - name: echo "List is {{ list1 }}"
+
+sudo salt master.example state.show_sls jinja.list
+master.example:
+jinja_list:
+  name:
+    echo "List is ['one', 'two', 'three']"`
+
+View a single item from a list same as Python:
+`cat /srv/salt/file/base/jinja/list_item.sls
+{% set list1 = ['one','two','three'] %}
+jinja_list:
+  cmd.run:
+  - name: echo "List item 2 is {{ list1[2] }}"
+
+sudo salt master.example state.show_sls jinja.list_item
+master.example:
+jinja_list_item:
+  name:
+    echo "List item 2 is is three"`
+
+Jinja includes dictionaries (hashes) as well.
+Use same syntax as Python:
+`%{ set my_dict = {'first': 'value 1', 'second': 'value 2'} %}
+jinja_dict_first:
+  cmd_run:
+  - name: echo "First item is {{ my_dict['first'] }}"
+
+sudo salt master.example state.show_sls jinja.dict
+master.example:
+jinja_dict_first:
+  name:
+    echo "First item is value 1"`
+
+A number of python functions are supported, like listing the keys for a dictionary:
+`cat /srv/salt/file/base/jinja/keys.sls
+%{ set my_dict = {'first': 'value 1', 'second': 'value 2'} %}
+jinja_keys:
+  cmd.run:
+  - name: echo "Keys are {{ my_dict.keys() }}"`
+
+==== Basic control structures ====
+Standard control structures
+If statements and for loops
+Control structures, need to be encapsulated in `{% %}`
+Control structures need to explicityly mark the end of the block.
+Example if statement:
+`cat /srv/salt/file/base/jinja/if.sls
+{% set my_bool = true %}
+jinja_if:
+  cmd.run:
+  {% if my_bool %}
+  - name: 'echo "It is true."'
+  {% else %}
+  - name: 'echo "It is false."'
+  {% endif %}`
+
+Keywords if, else and endif
+Renderer will pass any files through the Jinja template before parsing as YAML as then a Salt data structure
+
+Example for loop:
+`cat /srv/salt/file/base/jinja/for.sls
+{% set my_list = {'a', 'b', 'c'] %}
+{% for current in my_list %}
+jinja_for_{{ current }}:
+  cmd.run:
+  - name: "echo 'Current value is {{ current }}'"
+{% endfor %}`
+
+==== Other Jinja statements ====
+Other useful jinja statements, macro, include and import.
+Mach allows several statements to be executed as a single, logical block.
+Mini template, collect things together and refer to them using a single Jinja command.
+Example macro:
+`cat /srv/salt/file/base/jinja/macro.sls
+{% macro exclaim(string -%}
+{{ string + '!!!' -}}
+{%- endmacro %}
+jinja_macro:
+  cmd.run:
+  - name: "echo {{ exclaim('Yay') }}"`
+
+No return from macro, just prints output.
+Dashs near delimiters tell Jinja to remove end-of-line characters from the text
+
+Include statement pulls in rendered data from other files:
+`cat /srv/salt/file/base jinja/include.sls
+%{ include 'jinja/some_vars.jinja with context %}
+
+cat /srv/salt/file/base/jinja/some_vars.jinja
+{% set var = 'the string' %}
+some_var_include:
+  cmd.run:
+  - name: "excho 'From include, var is {{ var }}'"`
+
+Validate with `sudo salt master.example state.show_sls jinja.include`
+Remember files are included via Jinja before Salt can parse the data. Be careful to not duplicate state IDs.
+Files pulled via include are rendered.
+Variables in the second file will not be available to any files that include that file.
+To use those variables use the import statement.
+
+Example import code:
+`cat /srv/salt/file/base/jinja/vars.jinja
+{% set my_var = 'more strings' %}
+
+cat /srv/salt/file/base/jinja/from.sls
+{% from "jinja/vars.jinja import my_var as the_var with context %}
+jinja_from:
+  cmd.run:
+  - name: "echo 'The var is {{ the_var }}'"`
+
+Validate with `sudo salt master.example state.show_sls jinja.from`
+
+Multiple variables can be included, just separate them by commas like Python.
+
+== Templating with Jinja ==
