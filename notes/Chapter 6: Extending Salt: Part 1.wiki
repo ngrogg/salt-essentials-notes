@@ -132,7 +132,9 @@ some_var_include:
   cmd.run:
   - name: "excho 'From include, var is {{ var }}'"`
 
-Validate with `sudo salt master.example state.show_sls jinja.include`
+Validate with
+`sudo salt master.example state.show_sls jinja.include`
+
 Remember files are included via Jinja before Salt can parse the data. Be careful to not duplicate state IDs.
 Files pulled via include are rendered.
 Variables in the second file will not be available to any files that include that file.
@@ -148,8 +150,167 @@ jinja_from:
   cmd.run:
   - name: "echo 'The var is {{ the_var }}'"`
 
-Validate with `sudo salt master.example state.show_sls jinja.from`
+Validate with
+`sudo salt master.example state.show_sls jinja.from`
 
 Multiple variables can be included, just separate them by commas like Python.
 
 == Templating with Jinja ==
+Salt adds features on top of Jinja.
+Exposes grains, pillar data and execution modules
+
+Example of using the minion ID:
+`cat /srv/salt/file/base/jinja/grains.sls
+{% set name = grains['id'] %}
+jinja_grains:
+  cmd.run:
+  - name: "echo 'My name is {{ name }}'"`
+
+Validate with
+`sudo salt master.example state.show_sls jinja.grains`
+
+Salt can also expose opts,sls and env into jinja templates
+
+Some additional salt/jinja guides:
+https://docs.saltproject.io/salt/user-guide/en/latest/topics/jinja.html
+https://docs.saltproject.io/en/latest/topics/jinja/index.html
+
+Grains and pillar data are available as their own dictionaries.
+Execution modules are available within a dictionary named salt:
+`cat /srv/salt/file/base/jinja/cmd.sls
+{% set who = salt['cmd.run']('whoami') %}
+jinja_cmd:
+  cmd_run:
+  - name: "echo 'Whoami gives {{ who }}'"`
+
+Validate with
+`sudo salt master.example state.show_sls jinja.cmd`
+
+Execution module given as the value in the salt dictionary
+Arguments that may be required would follow.
+
+Importing variables from other Jinja files allows sharing of variables with different state files or pillar definitions.
+To use them tell Jinja to import the context.
+At the end of the import or from statement add the phrase "with context"
+Alert parsing libraries to expose all of salt's data structures to the child (or imported) file.
+
+=== Filtering by Grains ===
+One specific module to point out: `grains.filter_by`.
+Takes a data set and parses out the pieces needed based on a grain value:
+`cat /srv/salt/file/base/show_users.sls
+{% set all_users = {
+  'master.example': [],
+  'minion1.example': [],
+  'minion2.example': ['wilma'],
+  'minion3.example': ['wilma','barney','betty'],
+  'minion4.example': ['wilma','barney','betty','fred'],
+} %}
+{%set cur_users = salt ['grains.filter_by'}(all_users, grain='id') %}
+show users:
+  cmd.run:
+  - name: "echo 'User list is {{ cur_users }}'" `
+
+Validate with
+`sudo salt minion4\* state.sls show_users`
+
+The dictionary all_users lists some values with key being the minion ID
+Salt sets up grains as part of default install.
+Combine with grains.filter_by to build data sets for use cases.
+
+== Custom Execution Module ==
+Salt provides a way to write Python and execute it on every host
+
+Hello world Python example:
+`hello.py
+"""
+A collection of simple examples.
+"""
+def world():
+  """
+  The simplest of examples.
+  CLI Example::
+    salt '*' hello.world
+  """
+  return 'Hello, world.'
+`
+
+Note example uses docstrings.
+Using them should be considered best practice.
+Use sys.doc with module to see the output.
+
+Where to put file?
+Typically file_roots contains state files and Jinja files
+There are reserved directories: modules, grains and states.
+First one modules is where execution modules are kept.
+Place hello.py in modules folder.
+By default this will be /srv/salt/files/base/modules
+
+Need to sync modules before executing:
+`sudo salt \* saltutil.sync_modules`
+
+Should return changed modules.
+There is a delay between syncing and the modules being usable.
+
+Run with
+`sudo salt \* hello.world`
+
+Salt adds some custom data into the modules namespace: grains, salt and opts.
+All dictionaries and as with jinja exposes execution modules.
+Add an id function to the hello.py example from earlier:
+`def id():
+  """
+  Better example using the minion ID
+
+  CLI Example::
+    salt '*' hello.id
+  """
+
+  id = __grains__['id']
+  return 'Hello, {0}.'.format(id)`
+
+Validate with
+`sudo salt \* hello.id`
+
+Remember to sync the modules first!
+
+View documentation with
+`sudo salt-call sys.doc hello`
+
+Also be sure to configure and add logging.
+Import logging module and give some feedback for module.
+Using examples from hello.py:
+`cat /srv/salt/file/base/_modules/hello.py
+"""
+A collection of simple examples.
+"""
+import logging
+logger = logging.getLogger(__name__)
+
+def world():
+  """
+  The simplest of examples.
+  CLI Example::
+    salt '*' hello.world
+  """
+  return 'Hello, world.'
+
+def id():
+  """
+  Better example using the minion ID
+
+  CLI Example::
+    salt '*' hello.id
+  """
+
+  id = __grains__['id']
+  logger.debug('Found grain id: {0}'.format(id))
+  return 'Hello, {0}.'.format(id)`
+
+Use salt-call to view logging output.
+Only the return data is sent back to the master.
+Actual Salt output is logged on the minion.
+
+Re-sync modules and check log output with debug:
+`sudo salt-call --log-level=debug hello.id`
+
+== Custom State Modules ==
